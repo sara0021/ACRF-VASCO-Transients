@@ -1,0 +1,48 @@
+name: Run ACRF Model & Validate Results
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-acrf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas statsmodels matplotlib jupyter nbconvert
+
+      - name: Run GLM Notebook
+        run: |
+          jupyter nbconvert --execute --to notebook --inplace notebooks/01_acrf_glm_analysis.ipynb
+
+      - name: Validate Nuclear Coefficient
+        run: |
+          python -c "
+import json, sys
+with open('notebooks/01_acrf_glm_analysis.ipynb') as f:
+    nb = json.load(f)
+for cell in nb['cells']:
+    if 'nuclear_event' in ''.join(cell.get('source', [])):
+        print('GLM ran successfully')
+        sys.exit(0)
+print('ERROR: Nuclear effect not found')
+sys.exit(1)
+"
+
+      - name: Upload Plots
+        uses: actions/upload-artifact@v4
+        with:
+          name: acrf-results
+          path: results/
